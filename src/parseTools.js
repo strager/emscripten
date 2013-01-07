@@ -1001,7 +1001,7 @@ function asmInitializer(type, impl) {
   if (isIntImplemented(type)) {// || (impl && impl == 'VAR_EMULATED')) {
     return '0';
   } else {
-    return '0.0';
+    return '0.1'; // XXX temporary workaround XXX '0.0';
   }
 }
 
