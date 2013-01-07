@@ -293,6 +293,7 @@ def emscript(infile, settings, outfile, libraries=[]):
 
   if settings.get('ASM_JS'):
     simple = os.environ.get('EMCC_SIMPLE_ASM')
+    no_ft = os.environ.get('EMCC_NOFT_ASM')
     class Counter:
       i = 0
     def make_table(sig, raw):
@@ -303,7 +304,10 @@ def emscript(infile, settings, outfile, libraries=[]):
       coercions = ';'.join(['p%d = %sp%d%s' % (p, '+' if sig[p+1] == 'd' else '', p, '' if sig[p+1] == 'd' else '|0') for p in range(len(sig)-1)]) + ';'
       ret = '' if sig[0] == 'v' else ('return %s0' % ('+' if sig[0] == 'd' else ''))
       return 'function %s(%s) { %s abort(%d); %s };\n' % (bad, params, coercions, i, ret) + raw.replace('[0,', '[' + bad + ',').replace(',0,', ',' + bad + ',').replace(',0,', ',' + bad + ',').replace(',0]', ',' + bad + ']').replace(',0]', ',' + bad + ']')
-    function_tables_defs = '\n'.join([make_table(sig, raw) for sig, raw in last_forwarded_json['Functions']['tables'].iteritems()])
+    if not no_ft:
+      function_tables_defs = '\n'.join([make_table(sig, raw) for sig, raw in last_forwarded_json['Functions']['tables'].iteritems()])
+    else:
+      function_tables_defs = ''
 
     maths = ['Runtime.bitshift64', 'Math.floor', 'Math.min']
     if settings['USE_MATH_IMUL']:
@@ -323,24 +327,29 @@ var i64Math_modulo = function(a, b, c, d, e) { i64Math.modulo(a, b, c, d, e) };
 '''
     asm_runtime_funcs = ['stackAlloc', 'stackSave', 'stackRestore', 'setThrew'] + ['setTempRet%d' % i for i in range(10)]
     # function tables
-    function_tables = ['dynCall_' + table for table in last_forwarded_json['Functions']['tables']]
-    function_tables_impls = []
-    for sig in last_forwarded_json['Functions']['tables'].iterkeys():
-      args = ','.join(['a' + str(i) for i in range(1, len(sig))])
-      arg_coercions = ' '.join(['a' + str(i) + '=' + ('+' if sig[i] == 'd' else '') + 'a' + str(i) + ('|0' if sig[i] == 'i' else '') + ';' for i in range(1, len(sig))])
-      function_tables_impls.append('''
-  function dynCall_%s(index%s%s) {
-    index = index|0;
-    %s
-    %sFUNCTION_TABLE_%s[index&{{{ FTM_%s }}}](%s);
-  }
-''' % (sig, ',' if len(sig) > 1 else '', args, arg_coercions, 'return ' if sig[0] != 'v' else '', sig, sig, args))
+    if not no_ft:
+      function_tables = ['dynCall_' + table for table in last_forwarded_json['Functions']['tables']]
+      function_tables_impls = []
+      for sig in last_forwarded_json['Functions']['tables'].iterkeys():
+        args = ','.join(['a' + str(i) for i in range(1, len(sig))])
+        arg_coercions = ' '.join(['a' + str(i) + '=' + ('+' if sig[i] == 'd' else '') + 'a' + str(i) + ('|0' if sig[i] == 'i' else '') + ';' for i in range(1, len(sig))])
+        function_tables_impls.append('''
+    function dynCall_%s(index%s%s) {
+      index = index|0;
+      %s
+      %sFUNCTION_TABLE_%s[index&{{{ FTM_%s }}}](%s);
+    }
+  ''' % (sig, ',' if len(sig) > 1 else '', args, arg_coercions, 'return ' if sig[0] != 'v' else '', sig, sig, args))
+    else:
+      function_tables = []
+      function_tables_impls = []
+
     # calculate exports
     exported_implemented_functions = list(exported_implemented_functions)
     exports = []
     if not simple:
       for export in exported_implemented_functions + asm_runtime_funcs + function_tables:
-        exports.append("'%s': %s" % (export, export))
+        exports.append("%s: %s" % (export, export))
       exports = '{ ' + ', '.join(exports) + ' }'
     else:
       exports = '_main'
