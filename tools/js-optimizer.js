@@ -1253,7 +1253,7 @@ var ASM_DOUBLE = 1;
 function detectAsmCoercion(node) {
   // for params, +x vs x|0, for vars, +0 vs 0, so check for "+"
   assert(node[0] == 'num');
-  return node[1].toString().indexOf('.') >= 0) ? ASM_DOUBLE : ASM_INT;  // XXX temporary workaround XXX
+  return node[1].toString().indexOf('.') >= 0 ? ASM_DOUBLE : ASM_INT;  // XXX temporary workaround XXX
 }
 
 function makeAsmParamCoercion(param, type) {
