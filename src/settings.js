@@ -118,7 +118,9 @@ var INLINING_LIMIT = 50; // A limit on inlining. If 0, we will inline normally i
 var CATCH_EXIT_CODE = 0; // If set, causes exit() to throw an exception object which is caught
                          // in a try..catch block and results in the exit status being
                          // returned from run(). If zero (the default), the program is just
-                         // terminated with an error message.
+                         // terminated with an error message, that is, the exception thrown
+                         // by exit() is not handled in any way (in particular, the stack
+                         // position will not be reset).
 
 // Generated code debugging options
 var SAFE_HEAP = 0; // Check each write to the heap, for example, this will give a clear
@@ -138,7 +140,7 @@ var LABEL_FUNCTION_FILTERS = []; // Filters for function label debug.
                                  // labels of functions that is equaled to
                                  // one of the filters are printed out
                                  // When the array is empty, the filter is disabled.
-var EXCEPTION_DEBUG = 1; // Print out exceptions in emscriptened code
+var EXCEPTION_DEBUG = 0; // Print out exceptions in emscriptened code
 
 var LIBRARY_DEBUG = 0; // Print out when we enter a library call (library*.js). You can also unset
                        // Runtime.debug at runtime for logging to cease, and can set it when you
