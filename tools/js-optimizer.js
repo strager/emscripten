@@ -1251,9 +1251,9 @@ var ASM_INT = 0;
 var ASM_DOUBLE = 1;
 
 function detectAsmCoercion(node) {
-  // for params, +x vs x|0, for vars, +0 vs 0, so check for "+"
-  assert(node[0] == 'num');
-  return node[1].toString().indexOf('.') >= 0 ? ASM_DOUBLE : ASM_INT;  // XXX temporary workaround XXX
+  // for params, +x vs x|0, for vars, 0.0 vs 0
+  if (node[0] == 'num' && node[1].toString().indexOf('.') >= 0) return ASM_DOUBLE;
+  return node[0] == 'unary-prefix' ? ASM_DOUBLE : ASM_INT;
 }
 
 function makeAsmParamCoercion(param, type) {
