@@ -2275,6 +2275,8 @@ Exception execution path of first function! 1
     def test_exceptions(self):
         if Settings.QUANTUM_SIZE == 1: return self.skip("we don't support libcxx in q1")
 
+        Settings.EXCEPTION_DEBUG = 1
+
         self.banned_js_engines = [NODE_JS] # node issue 1669, exception causes stdout not to be flushed
         Settings.DISABLE_EXCEPTION_CATCHING = 0
         if self.emcc_args is None:
@@ -10236,6 +10238,9 @@ elif 'browser' in str(sys.argv):
       Popen([PYTHON, EMCC, path_from_root('tests', 'worker_api_2_worker.cpp'), '-o', 'worker.js', '-s', 'BUILD_AS_WORKER=1', '-O2', '--minify', '0', '-s', 'EXPORTED_FUNCTIONS=["_one", "_two", "_three", "_four"]']).communicate()
       self.btest('worker_api_2_main.cpp', args=['-O2', '--minify', '0'], expected='11')
 
+    def test_emscripten_async_wget2(self):
+      self.btest('http.cpp', expected='0', args=['-I' + path_from_root('tests')])
+
     pids_to_clean = []
     def clean_pids(self):
       import signal, errno
@@ -10315,7 +10320,7 @@ elif 'browser' in str(sys.argv):
 
     # always run these tests last
     # make sure to use different ports in each one because it takes a while for the processes to be cleaned up
-    def test_zz_websockets(self):
+    def test_websockets(self):
       try:
         with self.WebsockHarness(8990):
           self.btest('websockets.c', expected='571')
@@ -10330,7 +10335,7 @@ elif 'browser' in str(sys.argv):
         proc.communicate()
       return relay_server
 
-    def test_zz_websockets_bi(self):
+    def test_websockets_bi(self):
       for datagram in [0,1]:
         try:
           with self.WebsockHarness(8992, self.make_relay_server(8992, 8994)):
@@ -10340,7 +10345,7 @@ elif 'browser' in str(sys.argv):
         finally:
           self.clean_pids()
 
-    def test_zz_websockets_bi_listen(self):
+    def test_websockets_bi_listen(self):
       try:
         with self.WebsockHarness(6992, self.make_relay_server(6992, 6994)):
           with self.WebsockHarness(6994, no_server=True):
@@ -10349,14 +10354,14 @@ elif 'browser' in str(sys.argv):
       finally:
         self.clean_pids()
 
-    def test_zz_websockets_gethostbyname(self):
+    def test_websockets_gethostbyname(self):
       try:
         with self.WebsockHarness(7000):
           self.btest('websockets_gethostbyname.c', expected='571', args=['-O2'])
       finally:
         self.clean_pids()
 
-    def test_zz_websockets_bi_bigdata(self):
+    def test_websockets_bi_bigdata(self):
       try:
         with self.WebsockHarness(3992, self.make_relay_server(3992, 3994)):
           with self.WebsockHarness(3994, no_server=True):
@@ -10365,7 +10370,7 @@ elif 'browser' in str(sys.argv):
       finally:
         self.clean_pids()
 
-    def test_zz_enet(self):
+    def test_enet(self):
       try_delete(self.in_dir('enet'))
       shutil.copytree(path_from_root('tests', 'enet'), self.in_dir('enet'))
       pwd = os.getcwd()
