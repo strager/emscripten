@@ -404,7 +404,7 @@ function removeUnneededLabelSettings(ast) {
 
 // Various expression simplifications. Pre run before closure (where we still have metadata), Post run after.
 
-function simplifyExpressionsPre(ast) {
+function simplifyExpressionsPre(ast, asm) {
   // When there is a bunch of math like (((8+5)|0)+12)|0, only the external |0 is needed, one correction is enough.
   // At each node, ((X|0)+Y)|0 can be transformed into (X+Y): The inner corrections are not needed
   // TODO: Is the same is true for 0xff, 0xffff?
@@ -423,16 +423,18 @@ function simplifyExpressionsPre(ast) {
           // We might be able to remove this correction
           for (var i = stack.length-1; i >= 0; i--) {
             if (stack[i] == 1) {
-              // Great, we can eliminate
-              rerun = true;
               // we will replace ourselves with the non-zero side. Recursively process that node.
               var result = jsonCompare(node[2], ZERO) ? node[3] : node[2], other;
+              // Great, we can eliminate
+              rerun = true;
               while (other = process(result, result[0], stack)) {
                 result = other;
               }
               return result;
             } else if (stack[i] == -1) {
               break; // Too bad, we can't
+            } else if (asm) {
+              break; // we must keep a coercion right on top of a heap access in asm mode
             }
           }
           stack.push(1); // From here on up, no need for this kind of correction, it's done at the top
@@ -520,6 +522,10 @@ function simplifyExpressionsPre(ast) {
   simplifyBitops(ast);
   joinAdditions(ast);
   // simplifyZeroComp(ast); TODO: investigate performance
+}
+
+function simplifyExpressionsPreAsm(ast) {
+  simplifyExpressionsPre(ast, true);
 }
 
 // In typed arrays mode 2, we can have
@@ -1394,6 +1400,7 @@ function registerize(ast, asm) {
     // We also mark local variables - i.e., having a var definition
     var localVars = {};
     var hasSwitch = false; // we cannot optimize variables if there is a switch
+    var hasReturnValue = false;
     traverse(fun, function(node, type) {
       if (type == 'var') {
         node[1].forEach(function(defined) { localVars[defined[0]] = 1 });
@@ -1405,6 +1412,8 @@ function registerize(ast, asm) {
         }
       } else if (type == 'switch') {
         hasSwitch = true;
+      } else if (asm && type == 'return' && node[1]) {
+        hasReturnValue = true;
       }
     });
     vacuum(fun);
@@ -1581,6 +1590,15 @@ function registerize(ast, asm) {
         }
       }
       denormalizeAsm(fun, finalAsmData);
+      // Add a final return if one is missing. This is not strictly a register operation, but
+      // this pass traverses the entire AST anyhow so adding it here is efficient.
+      if (hasReturnValue) {
+        var stats = getStatements(fun);
+        var last = stats[stats.length-1];
+        if (last[0] != 'return') {
+          stats.push(['return', ['num', 0]]);
+        }
+      }
     }
   });
 }
@@ -2134,6 +2152,7 @@ var passes = {
   removeAssignsToUndefined: removeAssignsToUndefined,
   //removeUnneededLabelSettings: removeUnneededLabelSettings,
   simplifyExpressionsPre: simplifyExpressionsPre,
+  simplifyExpressionsPreAsm: simplifyExpressionsPreAsm,
   optimizeShiftsConservative: optimizeShiftsConservative,
   optimizeShiftsAggressive: optimizeShiftsAggressive,
   simplifyExpressionsPost: simplifyExpressionsPost,
