@@ -998,6 +998,7 @@ try:
     for name, create, fix, library_symbols in [('libcxx',    create_libcxx,    fix_libcxx,    libcxx_symbols),
                                                ('libcxxabi', create_libcxxabi, fix_libcxxabi, libcxxabi_symbols),
                                                ('dlmalloc',  create_dlmalloc,  fix_dlmalloc,  dlmalloc_symbols)]:
+      break # XXX
       need = set()
       has = set()
       for temp_file in temp_files:
@@ -1196,6 +1197,8 @@ try:
 
     if shared.Settings.RELOOP:
       js_optimizer_queue += ['optimizeShiftsAggressive', get_eliminate()] # aggressive shifts optimization requires loops, it breaks on switches
+      # XXX remove optimize shifts until we get support for H32[constant] (no shifts)
+      #js_optimizer_queue += [get_eliminate()] # aggressive shifts optimization requires loops, it breaks on switches
 
   if closure:
     flush_js_optimizer_queue()
