@@ -938,8 +938,9 @@ try:
     def create_libc():
       if DEBUG: print >> sys.stderr, 'emcc: building libc for cache'
       o_s = []
-      for src in [#'dlmalloc.c', os.path.join('libc', 'musl', 'memcpy.c'),
-                  os.path.join('libcxx', 'new.cpp')]:
+      for src in [#'dlmalloc.c',
+                  os.path.join('libc', 'musl', 'memcpy.c')]:
+                  #os.path.join('libcxx', 'new.cpp')]:
         o = in_temp(os.path.basename(src) + '.o')
         execute([shared.PYTHON, shared.EMCC, shared.path_from_root('system', 'lib', src), '-o', o], stdout=stdout, stderr=stderr)
         o_s.append(o)
@@ -947,6 +948,7 @@ try:
       return in_temp('libc.bc')
 
     def fix_libc(need):
+      shared.Settings.EXPORTED_FUNCTIONS.append('_memcpy') # XXX always keep it
       # If an intrinsic alias of memcpy is used, we need memcpy
       for memcpy_alias in ['llvm.memcpy.i32', 'llvm.memcpy.i64', 'llvm.memcpy.p0i8.p0i8.i32', 'llvm.memcpy.p0i8.p0i8.i64']:
         if memcpy_alias in need:
