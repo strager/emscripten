@@ -263,7 +263,7 @@ process(sys.argv[1])
     if output_processor is not None:
       output_processor(open(filename + '.o.js').read())
 
-  def run_generated_code(self, engine, filename, args=[], check_timeout=True):
+  def run_generated_code(self, engine, filename, args=[], check_timeout=True, output_nicerizer=None):
     stdout = os.path.join(self.get_dir(), 'stdout') # use files, as PIPE can get too full and hang us
     stderr = os.path.join(self.get_dir(), 'stderr')
     try:
@@ -274,7 +274,12 @@ process(sys.argv[1])
     run_js(filename, engine, args, check_timeout, stdout=open(stdout, 'w'), stderr=open(stderr, 'w'))
     if cwd is not None:
       os.chdir(cwd)
-    ret = open(stdout, 'r').read() + open(stderr, 'r').read()
+    out = open(stdout, 'r').read()
+    err = open(stderr, 'r').read()
+    if output_nicerizer:
+      ret = output_nicerizer(out, err)
+    else:
+      ret = out + err
     assert 'strict warning:' not in ret, 'We should pass all strict mode checks: ' + ret
     return ret
 
@@ -451,9 +456,7 @@ if 'benchmark' not in str(sys.argv) and 'sanity' not in str(sys.argv) and 'brows
         js_engines = filter(lambda engine: engine not in self.banned_js_engines, js_engines)
         if len(js_engines) == 0: return self.skip('No JS engine present to run this test with. Check %s and the paths therein.' % EM_CONFIG)
         for engine in js_engines:
-          js_output = self.run_generated_code(engine, filename + '.o.js', args)
-          if output_nicerizer is not None:
-              js_output = output_nicerizer(js_output)
+          js_output = self.run_generated_code(engine, filename + '.o.js', args, output_nicerizer=output_nicerizer)
           self.assertContained(expected_output, js_output.replace('\r\n', '\n'))
           self.assertNotContained('ERROR', js_output)
 
@@ -3155,7 +3158,7 @@ Exiting setjmp function, level: 0, prev_jmp: -1
             return 0;
           }
           '''
-        self.do_run(src, '*2,2,5,8,8***8,8,5,8,8***7,2,6,990,7,2*', [], lambda x: x.replace('\n', '*'))
+        self.do_run(src, '*2,2,5,8,8***8,8,5,8,8***7,2,6,990,7,2*', [], lambda x, err: x.replace('\n', '*'))
 
     def test_emscripten_api(self):
         #if Settings.MICRO_OPTS or Settings.RELOOP or Building.LLVM_OPTS: return self.skip('FIXME')
@@ -3920,7 +3923,7 @@ The current type of b is: 9
             return 0;
           }
           '''
-        def check(result):
+        def check(result, err):
           return hashlib.sha1(result).hexdigest()
         self.do_run(src, '6c9cdfe937383b79e52ca7a2cce83a21d9f5422c',
                     output_nicerizer = check)
@@ -4233,7 +4236,7 @@ def process(filename):
   open(filename, 'w').write(src)
 '''
       self.do_run(src, 'Sort with main comparison: 5 4 3 2 1 *Sort with lib comparison: 1 2 3 4 5 *',
-                  output_nicerizer=lambda x: x.replace('\n', '*'),
+                  output_nicerizer=lambda x, err: x.replace('\n', '*'),
                   post_build=add_pre_run_and_checks)
 
     def test_dlfcn_data_and_fptr(self):
@@ -4337,7 +4340,7 @@ def process(filename):
   open(filename, 'w').write(src)
 '''
       self.do_run(src, 'In func: 13*First calling main_fptr from lib.*Second calling lib_fptr from main.*parent_func called from child*parent_func called from child*Var: 42*',
-                   output_nicerizer=lambda x: x.replace('\n', '*'),
+                   output_nicerizer=lambda x, err: x.replace('\n', '*'),
                    post_build=add_pre_run_and_checks)
 
     def test_dlfcn_alias(self):
@@ -4392,7 +4395,7 @@ def process(filename):
   open(filename, 'w').write(src)
 '''
       self.do_run(src, 'Parent global: 123.*Parent global: 456.*',
-                  output_nicerizer=lambda x: x.replace('\n', '*'),
+                  output_nicerizer=lambda x, err: x.replace('\n', '*'),
                   post_build=add_pre_run_and_checks,
                   extra_emscripten_args=['-H', 'libc/fcntl.h,libc/sys/unistd.h,poll.h,libc/math.h,libc/time.h,libc/langinfo.h'])
       Settings.INCLUDE_FULL_LIBRARY = 0
@@ -6107,7 +6110,7 @@ int main(int argc, char **argv) {
 (50,'''GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGA*TCACCTGAGGTCAGGAGTTCGAGACCAGCCTGGCCAACAT*cttBtatcatatgctaKggNcataaaSatgtaaaDcDRtBggDtctttataattcBgtcg**tactDtDagcctatttSVHtHttKtgtHMaSattgWaHKHttttagacatWatgtRgaaa**NtactMcSMtYtcMgRtacttctWBacgaa**agatactctgggcaacacacatacttctctcatgttgtttcttcggacctttcataacct**ttcctggcacatggttagctgcacatcacaggattgtaagggtctagtggttcagtgagc**ggaatatcattcgtcggtggtgttaatctatctcggtgtagcttataaatgcatccgtaa**gaatattatgtttatttgtcggtacgttcatggtagtggtgtcgccgatttagacgtaaa**ggcatgtatg*''') ]
         for i, j in results:
           src = open(path_from_root('tests', 'fasta.cpp'), 'r').read()
-          self.do_run(src, j, [str(i)], lambda x: x.replace('\n', '*'), no_build=i>1)
+          self.do_run(src, j, [str(i)], lambda x, err: x.replace('\n', '*'), no_build=i>1)
 
     def test_dlmalloc(self):
       if self.emcc_args is None: self.emcc_args = [] # dlmalloc auto-inclusion is only done if we use emcc
@@ -6421,27 +6424,22 @@ void*:16
       #    print opt, "FAIL"
 
     def test_lua(self):
-      if self.emcc_args is None and Building.LLVM_OPTS: return self.skip('llvm 3.1 and safe llvm opts break lua')
+      if self.emcc_args is None: return self.skip('requires emcc')
 
-      try:
-        os.environ['EMCC_LEAVE_INPUTS_RAW'] = '1'
+      if Settings.QUANTUM_SIZE == 1: return self.skip('TODO: make this work')
 
-        if Settings.QUANTUM_SIZE == 1: return self.skip('TODO: make this work')
+      # Overflows in luaS_newlstr hash loop
+      if self.emcc_args is None: Settings.SAFE_HEAP = 0 # Has various warnings, with copied HEAP_HISTORY values (fixed if we copy 'null' as the type)
+      Settings.CORRECT_OVERFLOWS = 1
+      Settings.CHECK_OVERFLOWS = 0
+      Settings.CORRECT_SIGNS = 1 # Not sure why, but needed
+      Settings.INIT_STACK = 1 # TODO: Investigate why this is necessary
 
-        # Overflows in luaS_newlstr hash loop
-        if self.emcc_args is None: Settings.SAFE_HEAP = 0 # Has various warnings, with copied HEAP_HISTORY values (fixed if we copy 'null' as the type)
-        Settings.CORRECT_OVERFLOWS = 1
-        Settings.CHECK_OVERFLOWS = 0
-        Settings.CORRECT_SIGNS = 1 # Not sure why, but needed
-        Settings.INIT_STACK = 1 # TODO: Investigate why this is necessary
-
-        self.do_ll_run(path_from_root('tests', 'lua', 'lua.ll'),
-                        'hello lua world!\n17\n1\n2\n3\n4\n7',
-                        args=['-e', '''print("hello lua world!");print(17);for x = 1,4 do print(x) end;print(10-3)'''],
-                        output_nicerizer=lambda string: string.replace('\n\n', '\n').replace('\n\n', '\n'),
-                        extra_emscripten_args=['-H', 'libc/fcntl.h,libc/sys/unistd.h,poll.h,libc/math.h,libc/langinfo.h,libc/time.h'])
-      finally:
-        del os.environ['EMCC_LEAVE_INPUTS_RAW']
+      self.do_ll_run(path_from_root('tests', 'lua', 'lua.ll'),
+                      'hello lua world!\n17\n1\n2\n3\n4\n7',
+                      args=['-e', '''print("hello lua world!");print(17);for x = 1,4 do print(x) end;print(10-3)'''],
+                      output_nicerizer=lambda string, err: (string + err).replace('\n\n', '\n').replace('\n\n', '\n'),
+                      extra_emscripten_args=['-H', 'libc/fcntl.h,libc/sys/unistd.h,poll.h,libc/math.h,libc/langinfo.h,libc/time.h'])
 
     def get_freetype(self):
       Settings.INIT_STACK = 1 # TODO: Investigate why this is necessary
@@ -6649,7 +6647,7 @@ def process(filename):
 
       # We use doubles in JS, so we get slightly different values than native code. So we
       # check our output by comparing the average pixel difference
-      def image_compare(output):
+      def image_compare(output, err):
         # Get the image generated by JS, from the JSON.stringify'd array
         m = re.search('\[[\d, -]*\]', output)
         try:
@@ -6739,17 +6737,9 @@ def process(filename):
     def test_lifetime(self):
       if self.emcc_args is None: return self.skip('test relies on emcc opts')
 
-      try:
-        os.environ['EMCC_LEAVE_INPUTS_RAW'] = '1'
-
-        self.do_ll_run(path_from_root('tests', 'lifetime.ll'), 'hello, world!\n')
-        if '-O1' in self.emcc_args or '-O2' in self.emcc_args:
-          assert 'a18' not in open(os.path.join(self.get_dir(), 'src.cpp.o.js')).read(), 'lifetime stuff and their vars must be culled'
-        else:
-          assert 'a18' in open(os.path.join(self.get_dir(), 'src.cpp.o.js')).read(), "without opts, it's there"
-
-      finally:
-        del os.environ['EMCC_LEAVE_INPUTS_RAW']
+      self.do_ll_run(path_from_root('tests', 'lifetime.ll'), 'hello, world!\n')
+      if '-O1' in self.emcc_args or '-O2' in self.emcc_args:
+        assert 'a18' not in open(os.path.join(self.get_dir(), 'src.cpp.o.js')).read(), 'lifetime stuff and their vars must be culled'
 
     # Test cases in separate files. Note that these files may contain invalid .ll!
     # They are only valid enough for us to read for test purposes, not for llvm-as
@@ -7642,7 +7632,7 @@ def process(filename):
         }
       '''
 
-      def check(output):
+      def check(output, err):
         # TODO: check the line #
         if self.emcc_args is None or self.emcc_args == []: # LLVM full opts optimize out some corrections
           assert re.search('^Overflow\|.*src.cpp:6 : 60 hits, %20 failures$', output, re.M), 'no indication of Overflow corrections: ' + output
@@ -11016,8 +11006,8 @@ fi
 
         # Building a file that doesn't need cached stuff should not trigger cache generation
         output = self.do([EMCC, path_from_root('tests', 'hello_world.cpp')])
-        assert INCLUDING_MESSAGE.replace('X', 'dlmalloc') not in output
-        assert BUILDING_MESSAGE.replace('X', 'dlmalloc') not in output
+        assert INCLUDING_MESSAGE.replace('X', 'libc') not in output
+        assert BUILDING_MESSAGE.replace('X', 'libc') not in output
         self.assertContained('hello, world!', run_js('a.out.js'))
         assert not os.path.exists(EMCC_CACHE)
         try_delete('a.out.js')
@@ -11029,7 +11019,7 @@ fi
         ll_name2 = os.path.join(TEMP_DIR, 'emscripten_temp', 'emcc-3-ll.ll')
 
         # Building a file that *does* need dlmalloc *should* trigger cache generation, but only the first time
-        for filename, libname in [('hello_malloc.cpp', 'dlmalloc'), ('hello_libcxx.cpp', 'libcxx')]:
+        for filename, libname in [('hello_malloc.cpp', 'libc'), ('hello_libcxx.cpp', 'libcxx')]:
           for i in range(3):
             print filename, libname, i
             self.clear()
@@ -11041,10 +11031,10 @@ fi
             output = self.do([EMCC, '-O' + str(i), '--closure', '0', '-s', 'RELOOP=0', '--llvm-lto', '0', path_from_root('tests', filename)])
             #print output
             assert INCLUDING_MESSAGE.replace('X', libname) in output
-            if libname == 'dlmalloc':
+            if libname == 'libc':
               assert INCLUDING_MESSAGE.replace('X', 'libcxx') not in output # we don't need libcxx in this code
             else:
-              assert INCLUDING_MESSAGE.replace('X', 'dlmalloc') in output # libcxx always forces inclusion of dlmalloc
+              assert INCLUDING_MESSAGE.replace('X', 'libc') in output # libcxx always forces inclusion of libc
             assert (BUILDING_MESSAGE.replace('X', libname) in output) == (i == 0), 'Must only build the first time'
             self.assertContained('hello, world!', run_js('a.out.js'))
             assert os.path.exists(EMCC_CACHE)

@@ -4199,50 +4199,15 @@ LibraryManager.library = {
     ret += makeCopyValues(dest, src, num, 'null', null, align);
     return ret;
   },
-  memcpy: function (dest, src, num, align) {
+
+  memcpy: function (dest, src, num) {
+    // simple version, in general it should not be used - we should pull it in from libc
 #if ASSERTIONS
-    assert(num % 1 === 0); //, 'memcpy given ' + num + ' bytes to copy. Problem with quantum=1 corrections perhaps?');
+    Module.printErr('warning: library.js memcpy should not be running!');
 #endif
-#if USE_TYPED_ARRAYS == 2
-    if (num >= {{{ SEEK_OPTIMAL_ALIGN_MIN }}} && src % 2 == dest % 2) {
-      // This is unaligned, but quite large, and potentially alignable, so work hard to get to aligned settings
-      if (src % 4 == dest % 4) {
-        var stop = src + num;
-        while (src % 4) { // no need to check for stop, since we have large num
-          HEAP8[dest++] = HEAP8[src++];
-        }
-        var src4 = src >> 2, dest4 = dest >> 2, stop4 = stop >> 2;
-        while (src4 < stop4) {
-          HEAP32[dest4++] = HEAP32[src4++];
-        }
-        src = src4 << 2;
-        dest = dest4 << 2;
-        while (src < stop) {
-          HEAP8[dest++] = HEAP8[src++];
-        }
-      } else {
-        var stop = src + num;
-        if (src % 2) { // no need to check for stop, since we have large num
-          HEAP8[dest++] = HEAP8[src++];
-        }
-        var src2 = src >> 1, dest2 = dest >> 1, stop2 = stop >> 1;
-        while (src2 < stop2) {
-          HEAP16[dest2++] = HEAP16[src2++];
-        }
-        src = src2 << 1;
-        dest = dest2 << 1;
-        if (src < stop) {
-          HEAP8[dest++] = HEAP8[src++];
-        }
-      }
-    } else {
-      while (num--) {
-        HEAP8[dest++] = HEAP8[src++];
-      }
+    while (num--) {
+      HEAP8[dest++] = HEAP8[src++];
     }
-#else
-    {{{ makeCopyValues('dest', 'src', 'num', 'null', null, 'align') }}};
-#endif
   },
 
   llvm_memcpy_i32: 'memcpy',
@@ -4262,7 +4227,7 @@ LibraryManager.library = {
         {{{ makeCopyValues('dest', 'src', 1, 'null', null, 1) }}};
       }
     } else {
-      _memcpy(dest, src, num, align);
+      _memcpy(dest, src, num);
     }
   },
   llvm_memmove_i32: 'memmove',
