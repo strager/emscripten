@@ -938,7 +938,8 @@ try:
     def create_libc():
       if DEBUG: print >> sys.stderr, 'emcc: building libc for cache'
       o_s = []
-      for src in ['dlmalloc.c', os.path.join('libc', 'musl', 'memcpy.c'), os.path.join('libcxx', 'new.cpp')]:
+      for src in [#'dlmalloc.c', os.path.join('libc', 'musl', 'memcpy.c'),
+                  os.path.join('libcxx', 'new.cpp')]:
         o = in_temp(os.path.basename(src) + '.o')
         execute([shared.PYTHON, shared.EMCC, shared.path_from_root('system', 'lib', src), '-o', o], stdout=stdout, stderr=stderr)
         o_s.append(o)
@@ -1005,10 +1006,9 @@ try:
 
     force = False # If we have libcxx, we must force inclusion of libc, since libcxx uses new internally. Note: this is kind of hacky
 
-    for name, create, fix, library_symbols in [('libcxx',    create_libcxx,    fix_libcxx,    libcxx_symbols),
-                                               ('libcxxabi', create_libcxxabi, fix_libcxxabi, libcxxabi_symbols),
+    for name, create, fix, library_symbols in [# XXX ('libcxx',    create_libcxx,    fix_libcxx,    libcxx_symbols),
+                                               # XXX ('libcxxabi', create_libcxxabi, fix_libcxxabi, libcxxabi_symbols),
                                                ('libc',      create_libc,      fix_libc,      libc_symbols)]:
-      break # XXX
       need = set()
       has = set()
       for temp_file in temp_files:
