@@ -3618,6 +3618,13 @@ LibraryManager.library = {
   },
   free: function(){},
 
+  _Znwj: 'malloc', // XXX
+  _Znaj: 'malloc',
+  _Znam: 'malloc',
+  _Znwm: 'malloc',
+  _ZdlPv: 'free',
+  _ZdaPv: 'free',
+
   calloc__deps: ['malloc'],
   calloc: function(n, s) {
     var ret = _malloc(n*s);
