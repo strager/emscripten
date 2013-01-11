@@ -293,7 +293,7 @@ def emscript(infile, settings, outfile, libraries=[]):
 
   if settings.get('ASM_JS'):
     simple = os.environ.get('EMCC_SIMPLE_ASM')
-    no_ft = os.environ.get('EMCC_NOFT_ASM')
+    no_ft = 1 # os.environ.get('EMCC_NOFT_ASM')
     class Counter:
       i = 0
     def make_table(sig, raw):
