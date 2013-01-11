@@ -424,7 +424,9 @@ function JSify(data, functionsOnly, givenFunctions) {
             deps.push(snippet);
             snippet = '_' + snippet;
           }
-          if (ASM_JS && (typeof target == 'function' || /Math\..+/.exec(snippet))) {
+          // In asm, we need to know about library functions. If there is a target, though, then no
+          // need to consider this a library function - we will call directly to it anyhow
+          if (ASM_JS && !redirectedIdent && (typeof target == 'function' || /Math\..+/.exec(snippet))) {
             Functions.libraryFunctions[ident] = 1;
           }
         } else if (typeof snippet === 'object') {
@@ -457,6 +459,18 @@ function JSify(data, functionsOnly, givenFunctions) {
         if (redirectedIdent) {
           deps = deps.concat(LibraryManager.library[redirectedIdent + '__deps'] || []);
         }
+        if (ASM_JS) {
+          // In asm, dependencies implemented in C might be needed by JS library functions.
+          // We don't know yet if they are implemented in C or not. To be safe, export such
+          // special cases.
+          [LIBRARY_DEPS_TO_AUTOEXPORT].forEach(function(special) {
+            deps.forEach(function(dep) {
+              if (dep == special && !EXPORTED_FUNCTIONS[dep]) {
+                EXPORTED_FUNCTIONS[dep] = 1;
+              }
+            });
+          });
+        }
         // $ident's are special, we do not prefix them with a '_'.
         if (ident[0] === '$') {
           ident = ident.substr(1);
@@ -464,7 +478,8 @@ function JSify(data, functionsOnly, givenFunctions) {
           ident = '_' + ident;
         }
         var text = (deps ? '\n' + deps.map(addFromLibrary).filter(function(x) { return x != '' }).join('\n') : '');
-        text += isFunction ? snippet : 'var ' + ident + '=' + snippet + ';';
+        // redirected idents just need a var, but no value assigned to them - it would be unused
+        text += isFunction ? snippet : ('var ' + ident + (redirectedIdent ? '' : '=' + snippet) + ';');
         if (EXPORT_ALL || (ident in EXPORTED_FUNCTIONS)) {
           text += '\nModule["' + ident + '"] = ' + ident + ';';
         }
@@ -1234,7 +1249,16 @@ function JSify(data, functionsOnly, givenFunctions) {
     // We cannot compile assembly. See comment in intertyper.js:'Call'
     assert(ident != 'asm', 'Inline assembly cannot be compiled to JavaScript!');
 
-    var shortident = LibraryManager.getRootIdent(ident.slice(1)) || ident.slice(1); // ident may not be in library, if all there is is ident__inline
+    var shortident = ident.slice(1);
+    var callIdent = LibraryManager.getRootIdent(shortident);
+    if (callIdent) {
+      shortident = callIdent; // ident may not be in library, if all there is is ident__inline, but in this case it is
+      if (callIdent.indexOf('.') < 0) {
+        callIdent = '_' + callIdent; // Not Math.*, so add the normal prefix
+      }
+    } else {
+      callIdent = ident;
+    }
     var args = [];
     var argsTypes = [];
     var varargs = [];
@@ -1322,12 +1346,12 @@ function JSify(data, functionsOnly, givenFunctions) {
       var sig = Functions.getSignature(returnType, argsTypes);
       if (ASM_JS) {
         assert(returnType.search(/\("'\[,/) == -1); // XXX need isFunctionType(type, out)
-        ident = '(' + ident + ')&{{{ FTM_' + sig + ' }}}'; // the function table mask is set in emscripten.py
+        callIdent = '(' + callIdent + ')&{{{ FTM_' + sig + ' }}}'; // the function table mask is set in emscripten.py
       }
-      ident = Functions.getTable(sig) + '[' + ident + ']';
+      callIdent = Functions.getTable(sig) + '[' + callIdent + ']';
     }
 
-    var ret = ident + '(' + args.join(', ') + ')';
+    var ret = callIdent + '(' + args.join(', ') + ')';
     if (ASM_JS) { // TODO: do only when needed (library functions and Math.*?) XXX && shortident in Functions.libraryFunctions) {
       ret = asmCoercion(ret, returnType);
       if (shortident == 'abort' && funcData.returnType != 'void') {

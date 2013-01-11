@@ -3603,6 +3603,10 @@ LibraryManager.library = {
   // stdlib.h
   // ==========================================================================
 
+  // tiny, fake malloc/free implementation. If the program actually uses malloc,
+  // a compiled version will be used; this will only be used if the runtime
+  // needs to allocate something, for which this is good enough if otherwise
+  // no malloc is needed.
   malloc: function(bytes) {
     /* Over-allocate to make sure it is byte-aligned by 8.
      * This will leak memory, but this is only the dummy
@@ -3612,14 +3616,7 @@ LibraryManager.library = {
     ptr = Runtime.staticAlloc(bytes + 8);
     return (ptr+8) & 0xFFFFFFF8;
   },
-  _Znwj: 'malloc',
-  _Znaj: 'malloc',
-  _Znam: 'malloc',
-  _Znwm: 'malloc',
-
   free: function(){},
-  _ZdlPv: 'free',
-  _ZdaPv: 'free',
 
   calloc__deps: ['malloc'],
   calloc: function(n, s) {
@@ -4202,8 +4199,10 @@ LibraryManager.library = {
 
   memcpy: function (dest, src, num) {
     // simple version, in general it should not be used - we should pull it in from libc
-#if ASSERTIONS
-    Module.printErr('warning: library.js memcpy should not be running!');
+    if (!_memcpy.shown) {
+      _memcpy.shown = true;
+      Module.printErr('warning: library.js memcpy should not be running, it is only for testing!');
+    }
 #endif
     while (num--) {
       HEAP8[dest++] = HEAP8[src++];
