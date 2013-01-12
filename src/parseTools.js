@@ -1008,7 +1008,7 @@ function asmEnsureFloat(value, type) { // ensures that a float type has either 5
 
 function asmInitializer(type, impl) {
   if (type in Runtime.FLOAT_TYPES) {
-    return '0.1'; // XXX temporary workaround XXX '0.0';
+    return '+0';
   } else {
     return '0';
   }

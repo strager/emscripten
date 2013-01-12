@@ -1272,9 +1272,9 @@ function makeAsmParamCoercion(param, type) {
   return type == ASM_INT ? ['binary', '|', ['name', param], ['num', 0]] : ['unary-prefix', '+', ['name', param]];
 }
 
-function makeAsmVarDef(v, type) {
-  return [v, ['num', type == ASM_INT ? 0 : 0.1]]; // XXX temporary workaround XXX
-}
+ function makeAsmVarDef(v, type) {
+  return [v, type == ASM_INT ? ['num', 0] : ['unary-prefix', '+', ['num', 0]]];
+ }
 
 function normalizeAsm(func) {
   //printErr('pre-normalize \n\n' + astToSrc(func) + '\n\n');
