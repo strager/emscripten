@@ -276,6 +276,11 @@ process(sys.argv[1])
       os.chdir(cwd)
     out = open(stdout, 'r').read()
     err = open(stderr, 'r').read()
+    if engine == SPIDERMONKEY_ENGINE:
+      if 'Successfully compiled asm.js code' in err:
+        print "[was asm.js'ified]"
+      else:
+        print "[failed to asm.js'ify]"
     if output_nicerizer:
       ret = output_nicerizer(out, err)
     else:
@@ -2316,8 +2321,8 @@ Exception execution path of first function! 1
         self.do_run(src, '*throw...caught!infunc...done!*')
 
         Settings.DISABLE_EXCEPTION_CATCHING = 1
-        self.do_run(src, 'Compiled code throwing an exception')
-        
+        self.do_run(src, 'Exception catching is disabled, this exception cannot be caught. Compile with -s DISABLE_EXCEPTION_CATCHING=0 to catch.')
+
         src = '''
         #include <iostream>
         
