@@ -239,6 +239,7 @@ mergeInto(LibraryManager.library, {
 #if GL_TESTING
             preserveDrawingBuffer: true,
 #endif
+            stencil: true,
             alpha: false
           });
         } else {
